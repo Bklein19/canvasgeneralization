@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://unpkg.com/konva@8.0.4/konva.min.js"></script>
+    <meta charset="utf-8" />
+    <title>TF Color Generation</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background-color: #f0f0f0;
+      }
+    </style>
+  </head>
+
+  <body style="margin-left: 15px; margin-top: 15px;">
+    Tool:
+    <select id="tool">
+      <option value="brush">Brush</option>
+      <option value="eraser">Eraser</option>
+    </select>
+    <br />
+    Color:
+    <input type="color" id="color_selector" name="color_selector" value="#df4b26" style="width: 50px; height: 20px; margin:5px;"/>
+    <br />
+    Epochs:
+    <input type="text" id="epochs" name="epochs" value=1 style="width: 20px;"/>
+    <br />
+    Learning Rate:
+    <input type="text" id="learning_rate" name="learning_rate" value=0.00001 style="width: 80px;"/>
+    <script>
+        const log = document.getElementById('color_selector');
+        log.addEventListener('change', updateValue);
+        function updateValue(e) {
+            log.textContent = e.target.value;
+            log.value = e.target.value;
+            log.setAttribute("value", e.target.value);
+            var canvas = document.getElementById('input_canvas');
+            var context = canvas.getContext('2d');
+            context.strokeStyle = e.target.value;
+        }
+    </script>
+    <script>
+        const epochsval = document.getElementById('epochs');
+        epochsval.addEventListener('change', updateValue);
+        function updateValue(e) {
+            epochsval.textContent = e.target.value;
+            epochsval.value = e.target.value;
+            epochsval.setAttribute("value", e.target.value);
+        }
+    </script>
+    <script>
+        const lrate = document.getElementById('epochs');
+        lratlrateeval.addEventListener('change', updateValue);
+        function updateValue(e) {
+            lrate.textContent = e.target.value;
+            lrate.value = e.target.value;
+            lrate.setAttribute("value", e.target.value);
+        }
+    </script>
+    <div>
+        <div>
+            <div>
+                
+            </div>
+            <div id="container" style="margin-top: 15px; height:250px; width:250px; background-color:powderblue;"></div>
+            <script>
+            var width = 250;
+            var height = 250;
+
+            // first we need Konva core things: stage and layer
+            var stage = new Konva.Stage({
+                container: 'container',
+                width: width,
+                height: height,
+            });
+
+            var layer = new Konva.Layer();
+            stage.add(layer);
+            stage.getContainer().style.border = '2px solid black'
+
+
+            // then we are going to draw into special canvas element
+            var canvas = document.createElement('canvas');
+            canvas.setAttribute("id", "input_canvas");
+            layer.getCanvas()._canvas.id="input_canvas";
+            canvas.width = stage.width(); 
+            canvas.height = stage.height();
+
+            // created canvas we can add to layer as "Konva.Image" element
+            var image = new Konva.Image({
+                image: canvas,
+                x: 0,
+                y: 0,
+            });
+            layer.add(image);
+
+            // Good. Now we need to get access to context element
+            var context = canvas.getContext('2d');
+            
+
+            var isPaint = false;
+            var lastPointerPosition;
+            var mode = 'brush';
+
+            // now we need to bind some events
+            // we need to start drawing on mousedown
+            // and stop drawing on mouseup
+            image.on('mousedown touchstart', function () {
+                isPaint = true;
+                lastPointerPosition = stage.getPointerPosition();
+            });
+
+            // will it be better to listen move/end events on the window?
+
+            stage.on('mouseup touchend', function () {
+                isPaint = false;
+            });
+
+            // and core function - drawing
+            stage.on('mousemove touchmove', function () {
+                context.strokeStyle =  document.getElementById("color_selector").value;
+                context.lineJoin = 'round';
+                context.lineWidth = 10;
+                if (!isPaint) {
+                return;
+                }
+
+                if (mode === 'brush') {
+                context.globalCompositeOperation = 'source-over';
+                }
+                if (mode === 'eraser') {
+                context.globalCompositeOperation = 'destination-out';
+                }
+                context.beginPath();
+
+                var localPos = {
+                x: lastPointerPosition.x - image.x(),
+                y: lastPointerPosition.y - image.y(),
+                };
+                context.moveTo(localPos.x, localPos.y);
+                var pos = stage.getPointerPosition();
+                localPos = {
+                x: pos.x - image.x(),
+                y: pos.y - image.y(),
+                };
+                context.lineTo(localPos.x, localPos.y);
+                context.closePath();
+                context.stroke();
+
+                lastPointerPosition = pos;
+                // redraw manually
+                layer.batchDraw();
+            });
+
+            var select = document.getElementById('tool');
+            select.addEventListener('change', function () {
+                mode = select.value;
+            });
+            </script>
+            <br />
+            <button onclick="do_tf_stuff()">
+                Click this to run the generalization!
+            </button>
+            <br />
+            <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs/dist/tf.min.js"> </script>
+            
+        </div>
+        <div>
+            <script>
+                function do_tf_stuff(){
+
+                    const ctx = layer.getContext();
+                    const imageData = ctx.getImageData(0, 0, width, height);
+                    console.log(imageData)
+                    
+                    const x_coord = []
+                    const y_coord= []
+                    const red_col = []
+                    const green_col = []
+                    const blue_col = []
+                    for (let i = 0; i < imageData.data.length; i++){
+                        var x = (i / 4) % 250;
+                        var y = Math.floor((i / 4) / 250);
+                        if(i % 4 == 0) {
+                            x_coord.push(x)
+                            y_coord.push(y)
+                            red_col.push(imageData.data[i])
+                        }
+                        if (i % 1 == 0 && i % 3 != 0) {
+                            green_col.push(imageData.data[i])
+                        }
+                        if (i % 2 == 0 && i % 4 != 0) {
+                            blue_col.push(imageData.data[i])
+                        }
+                    }
+                    const train_coords = []
+                    const train_colors = []
+                    const red_amt = []
+                    const green_amt = []
+                    const blue_amt = []
+                    const all_coords = []
+
+                    for (let i = 0; i < x_coord.length; i++){
+                        coords = [x_coord[i], y_coord[i]]
+                        red_amt.push(red_col[i])
+                        green_amt.push(green_col[i])
+                        blue_amt.push(blue_col[i])
+                        if (red_col[i] != 0 || green_col[i] != 0 || blue_col[i] != 0) {
+                            train_coords.push(coords)
+                            train_colors.push([red_col[i], green_col[i], blue_col[i]])
+                        }
+                        all_coords.push(coords)
+                    }
+                    tf.setBackend('cpu');
+                    console.log(tf.getBackend());
+
+                    //tf.setBackend("webgl");
+                    const train_coords_tensor = tf.tensor(train_coords)
+                    const train_color_tensor = tf.tensor(train_colors)
+                    // Notice there is no 'import' statement. 'tf' is available on the index-page
+                    // because of the script tag above.
+
+
+                    // Define a model for linear regression.
+                    const model = tf.sequential();
+                    model.add(tf.layers.dense({units: 3, inputShape: 2}));
+
+                    const learningRate = document.getElementById('learning_rate').value
+                    const optimizer = tf.train.sgd(learningRate);
+
+                    // Prepare the model for training: Specify the loss and the optimizer.
+                    model.compile({loss: 'meanSquaredError', optimizer: optimizer});
+
+                    created_image_data = []
+                    // Train the model using the data.
+                    model.fit(train_coords_tensor, train_color_tensor, {epochs: document.getElementById('epochs').value}).then(() => {
+                        // Use the model to do inference on a data point the model hasn't seen before:
+                        // Open the browser devtools to see the output
+                        let predict_val = model.predict(tf.tensor(all_coords))
+                        predict_val.print()
+                        predictions = predict_val.dataSync();
+                        const imageData = ctx.createImageData(250, 250);
+                        var num_iters = 0
+                        for (let i = 0; i < imageData.data.length; i+=4){
+                            imageData.data[i] = Math.max(Math.min(predictions[num_iters], 255), 0) //Red Value
+                            imageData.data[i+1] = Math.max(Math.min(predictions[num_iters+1], 255), 0) //Green Value
+                            imageData.data[i+2] = Math.max(Math.min(predictions[num_iters+2], 255), 0) //Blue Value
+                            imageData.data[i+3] = 255 //Alpha Value
+                            num_iters+=3
+                        }
+                        console.log(imageData)
+                        var output_canvas = document.getElementById('output');
+                        output_canvas.width = 250; 
+                        output_canvas.height = 250;
+                        var context_output = output_canvas.getContext('2d');
+                        context_output.putImageData(imageData, 0, 0)                
+                    });
+                }
+            </script>
+            <br />
+            <canvas id="output">
+        </div>
+    </div>
+  </body>
+</html>
